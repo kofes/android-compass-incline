@@ -9,6 +9,7 @@ import android.hardware.SensorManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.RotateAnimation
 import com.google.android.gms.ads.*
@@ -41,15 +42,15 @@ class MainActivity : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         setContentView(R.layout.activity_main)
 
+        MobileAds.initialize(this, getString(R.string.admob_app_id))
+        firebaseAnalytics = FirebaseAnalytics.getInstance(this)
+
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+
         bottom_orientation.max = 360
         bottom_orientation.min = 0
         left_orientation.max = 360
         left_orientation.min = 0
-
-        MobileAds.initialize(this, "ca-app-pub-3940256099942544~3347511713")
-        firebaseAnalytics = FirebaseAnalytics.getInstance(this)
-
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
         sensorEventListener = object: SensorEventListener {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -98,6 +99,8 @@ class MainActivity : AppCompatActivity() {
                     //
                     val checker = sqrt(cos(accumulatedYAngle / counter) * cos(accumulatedYAngle / counter)
                                 + cos(accumulatedZAngle / counter) * cos(accumulatedZAngle / counter))
+                    val zAngle = (accumulatedZAngle / counter / 2 / Math.PI) * 360 + 180
+                    val yAngle = (accumulatedYAngle / counter / Math.PI) * 360 + 180
                     if (checker > 1.41) {
                         text_view.setBackgroundColor(getColor(R.color.colorAccent))
                         text_view.text = "horizontal"
@@ -105,8 +108,8 @@ class MainActivity : AppCompatActivity() {
                         text_view.setBackgroundColor(getColor(R.color.colorPrimaryDark))
                         text_view.text = "verical"
                     }
-                    bottom_orientation.setProgress((accumulatedYAngle / counter / Math.PI * 360 + 180).toInt(), true)
-                    left_orientation.setProgress(((accumulatedZAngle / counter) / Math.PI * 360 + 180).toInt(), true)
+                    bottom_orientation.setProgress(zAngle.toInt(), true)
+                    left_orientation.setProgress(yAngle.toInt(), true)
                     val angle: Float = ((accumulatedXAngle / counter) / Math.PI * 360).toFloat()
                     val rotateAnimation = RotateAnimation(
                         currentOrientation,
@@ -135,8 +138,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var adCounter: Long = 0
+    private var adDeltaCounter: Long = 3
+
     override fun onResume() {
         super.onResume()
+        //
         bottom_orientation.max = 360
         bottom_orientation.min = 0
         left_orientation.max = 360
@@ -158,7 +165,7 @@ class MainActivity : AppCompatActivity() {
         }
         //
         val adView = InterstitialAd(this)
-        adView.adUnitId = "ca-app-pub-3940256099942544/1033173712"
+        adView.adUnitId = getString(R.string.admob_interstitial_id)
         adView.loadAd(AdRequest.Builder().build())
         adView.adListener = object : AdListener() {
             override fun onAdClosed() {
@@ -168,8 +175,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         float_button.setOnClickListener {
-            if (adView.isLoaded)
+            if (adCounter >= adDeltaCounter && adView.isLoaded) {
                 adView.show()
+                adCounter = 0
+            } else
+                ++adCounter
             when (stateView) {
                 StateView.SHOW_NOTHING -> {
                     compass_view.visibility = View.VISIBLE
